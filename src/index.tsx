@@ -1,11 +1,32 @@
-import { Atom, Result, useAtomValue } from "@effect-atom/atom-react";
-import { TextAttributes } from "@opentui/core";
-import { render, useKeyboard } from "@opentui/react";
-import { Effect, Schema } from "effect";
-import { useState } from "react";
+import { Atom, useAtom, useAtomSuspense } from "@effect-atom/atom-react"
+import { TextAttributes } from "@opentui/core"
+import { render, useKeyboard } from "@opentui/react"
+import { Effect, Schema } from "effect"
+import { Suspense } from "react"
 
-const borderColor = "#3A3F41";
-const backgroundColor = "#0D0D0D";
+const borderColor = "#3A3F41"
+const backgroundColor = "#0D0D0D"
+
+function App() {
+  return (
+    <box
+      backgroundColor={backgroundColor}
+      alignItems="center"
+      justifyContent="center"
+      flexGrow={1}
+    >
+      <box gap={1} width="100%" flexGrow={1} maxHeight={30} maxWidth={75}>
+        <box backgroundColor={"#FF5C02"}>
+          <text>{"   opentui demo of terminal.shop    "}</text>
+        </box>
+        <Header />
+        <Suspense fallback={<text>Loading shop...</text>}>
+          <ShopTab />
+        </Suspense>
+      </box>
+    </box>
+  )
+}
 
 // nothing cool here
 function Header() {
@@ -51,7 +72,7 @@ function Header() {
         <text attributes={TextAttributes.DIM}>[0]</text>
       </box>
     </box>
-  );
+  )
 }
 
 class CoffeeProduct extends Schema.Class<CoffeeProduct>(
@@ -65,12 +86,13 @@ class CoffeeProduct extends Schema.Class<CoffeeProduct>(
   color: Schema.String,
 }) {}
 
-class Shop extends Effect.Service<Shop>()("app/service/Shop", {
+class Products extends Effect.Service<Products>()("app/service/Products", {
+  accessors: true,
   effect: Effect.gen(function* () {
-    const products = Effect.gen(function* () {
+    const all = Effect.gen(function* () {
       // Sleep a bit to simulate fetching all the data from the store
       // the magic string below is actually type safe :)
-      yield* Effect.sleep("1 seconds");
+      yield* Effect.sleep("1 second")
       return [
         CoffeeProduct.make({
           id: "cron",
@@ -117,104 +139,60 @@ class Shop extends Effect.Service<Shop>()("app/service/Shop", {
             "A flavorful decaf coffee processed in the mountain waters of Brazil to create a dark chocolatey blend.",
           color: "#D53D81",
         }),
-      ];
-    });
+      ]
+    })
 
-    return { products };
+    return { all } as const
   }),
 }) {}
 
-const storeRuntime = Atom.runtime(Shop.Default);
+const productsRuntime = Atom.runtime(Products.Default)
 
-const productsAtom = storeRuntime.atom(
-  Effect.gen(function* () {
-    const shop = yield* Shop;
-    return yield* shop.products;
-  }),
-);
+const productsAtom = productsRuntime.atom(Products.all)
+
+const selectedProductIdxAtom = Atom.make(0)
 
 // Here we aren't worried so much about displaying a bunch of stuff
 // since the main goal is getting all the data behaviors right
 function ShopTab() {
-  const productsResult = useAtomValue(productsAtom);
+  const products = useAtomSuspense(productsAtom).value
 
-  return (
-    <box>
-      {Result.match(productsResult, {
-        onInitial(_) {
-          return <text>Loading...</text>;
-        },
-        onSuccess({ value }) {
-          return <ShopDetail products={value} />;
-        },
-        onFailure(_) {
-          return <text>Failed to load the shop.</text>;
-        },
-      })}
-    </box>
-  );
-}
-
-// This component is in happy land because it doesn't
-// need to think about any data fetching logic
-// all it has to do is display stuff thats given to it
-//
-// This is also nice since we don't have to deal with
-// weird conditional stuff where we don't have access
-// to the products yet. We know if we made it here,
-// products exist which is nice
-function ShopDetail({ products }: { products: (typeof CoffeeProduct.Type)[] }) {
-  // Local state like this that doesn't need to be accessed in other places
-  // can stay as react `useState` since we don't need to do complex effectful logic
-  const [selectedProductIdx, setSelectedProductIdx] = useState(0);
-  const selectedCoffee = products[selectedProductIdx];
+  const [selectedProductIdx, setSelectedProductIdx] = useAtom(
+    selectedProductIdxAtom,
+  )
+  const selectedCoffee = products[selectedProductIdx]
 
   useKeyboard((key) => {
-    if (key.name === "up") {
-      setSelectedProductIdx((prev) =>
-        prev > 0 ? prev - 1 : products.length - 1,
-      );
-    } else if (key.name === "down") {
-      setSelectedProductIdx((prev) =>
-        prev < products.length - 1 ? prev + 1 : 0,
-      );
+    switch (key.name) {
+      case "up":
+        return setSelectedProductIdx((prev) =>
+          prev > 0 ? prev - 1 : products.length - 1,
+        )
+      case "down":
+        return setSelectedProductIdx((prev) =>
+          prev < products.length - 1 ? prev + 1 : 0,
+        )
     }
-  });
+  })
 
   return (
     <box flexDirection="row" gap={2}>
       <box width={20}>
         <text>~ featured ~</text>
-        {products.slice(0, 1).map((product, index) => {
-          const isSelected = index === selectedProductIdx;
-          return (
-            <box backgroundColor={isSelected ? product.color : undefined}>
-              <text
-                attributes={
-                  isSelected ? TextAttributes.NONE : TextAttributes.DIM
-                }
-              >
-                {product.name}
-              </text>
-            </box>
-          );
-        })}
+        {products.slice(0, 1).map((product, index) => (
+          <ProductBox
+            product={product}
+            selected={index === selectedProductIdx}
+          />
+        ))}
 
         <text marginTop={1}>~ originals ~</text>
-        {products.slice(1).map((product, index) => {
-          const isSelected = index + 1 === selectedProductIdx;
-          return (
-            <box backgroundColor={isSelected ? product.color : undefined}>
-              <text
-                attributes={
-                  isSelected ? TextAttributes.NONE : TextAttributes.DIM
-                }
-              >
-                {product.name}
-              </text>
-            </box>
-          );
-        })}
+        {products.slice(1).map((product, index) => (
+          <ProductBox
+            product={product}
+            selected={index + 1 === selectedProductIdx}
+          />
+        ))}
       </box>
       {selectedCoffee && (
         <box flexGrow={1} gap={1}>
@@ -225,8 +203,9 @@ function ShopDetail({ products }: { products: (typeof CoffeeProduct.Type)[] }) {
             </text>
           </box>
 
-          {/* I want to set the text color but i have no idea how lol */}
-          <text>{`$${selectedCoffee.price}`}</text>
+          <text
+            style={{ fg: selectedCoffee.color }}
+          >{`$${selectedCoffee.price}`}</text>
 
           <text attributes={TextAttributes.DIM}>
             {selectedCoffee.description}
@@ -240,26 +219,23 @@ function ShopDetail({ products }: { products: (typeof CoffeeProduct.Type)[] }) {
         </box>
       )}
     </box>
-  );
+  )
 }
 
-function App() {
+function ProductBox({
+  product,
+  selected,
+}: {
+  product: CoffeeProduct
+  selected: boolean
+}) {
   return (
-    <box
-      backgroundColor={backgroundColor}
-      alignItems="center"
-      justifyContent="center"
-      flexGrow={1}
-    >
-      <box gap={1} width="100%" flexGrow={1} maxHeight={30} maxWidth={75}>
-        <box backgroundColor={"#FF5C02"}>
-          <text>{"   opentui demo of terminal.shop    "}</text>
-        </box>
-        <Header />
-        <ShopTab />
-      </box>
+    <box backgroundColor={selected ? product.color : undefined}>
+      <text attributes={selected ? TextAttributes.NONE : TextAttributes.DIM}>
+        {product.name}
+      </text>
     </box>
-  );
+  )
 }
 
-render(<App />);
+render(<App />)
