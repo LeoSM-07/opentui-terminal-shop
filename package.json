@@ -1,0 +1,23 @@
+{
+  "name": "opentui-testing",
+  "module": "src/index.tsx",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/index.tsx"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@effect-atom/atom-react": "^0.3.4",
+    "@effect/language-service": "^0.48.0",
+    "@opentui/core": "^0.1.30",
+    "@opentui/react": "^0.1.30",
+    "effect": "^3.18.4",
+    "react": "^19.1.1"
+  }
+}
