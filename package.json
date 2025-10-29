@@ -16,9 +16,11 @@
   "dependencies": {
     "@effect-atom/atom-react": "^0.3.4",
     "@effect/language-service": "^0.48.0",
+    "@effect/platform-bun": "^0.81.1",
     "@opentui/core": "^0.1.30",
     "@opentui/react": "^0.1.30",
     "effect": "^3.18.4",
+    "prettier-plugin-organize-imports": "^4.3.0",
     "react": "^19.1.1"
   }
 }
